@@ -142,34 +142,201 @@ def predict_category(text: str):
         return "Unknown", 0.0
 
 def calculate_match_score(resume_text: str, jd_text: str) -> float:
-    """Calculate match score using TF-IDF and Cosine Similarity"""
+    """Calculate raw text similarity using TF-IDF and Cosine Similarity"""
     if not resume_text.strip() or not jd_text.strip():
         return 0.0
-        
     try:
-        # We use a dedicated vectorizer for local similarity calculation 
-        # so it adjusts perfectly to the context of the two documents
         similarity_vectorizer = TfidfVectorizer(stop_words='english')
         tfidf_matrix = similarity_vectorizer.fit_transform([resume_text, jd_text])
-        
-        # Cosine similarity between resume and jd
         similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
-        
-        # Format to percentage
         return round(float(similarity) * 100, 2)
     except Exception as e:
         print(f"Error calculating similarity: {e}")
         return 0.0
 
+
+def calculate_satisfaction_score(resume_text: str, jd_text: str, resume_skills: list, jd_skills: list) -> float:
+    """
+    Weighted satisfaction score (0-100):
+      - 40% skill match ratio
+      - 40% TF-IDF text similarity
+      - 20% resume completeness signals
+    """
+    # Skill match component (40%)
+    if jd_skills:
+        resume_skills_lower = set(s.lower() for s in resume_skills)
+        jd_skills_lower = set(s.lower() for s in jd_skills)
+        matched = resume_skills_lower.intersection(jd_skills_lower)
+        skill_score = (len(matched) / max(len(jd_skills_lower), 1)) * 100
+    else:
+        skill_score = 50.0  # Neutral when no JD skills given
+
+    # Text similarity component (40%)
+    text_sim = calculate_match_score(resume_text, jd_text)
+
+    # Completeness component (20%) — checks for key resume signals
+    completeness = 0
+    completeness_checks = [
+        r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z]{2,}',   # email
+        r'\b(?:\+?\d[\d\s\-().]{7,})\b',                      # phone
+        r'\b(experience|worked|years|built|developed|designed)\b',  # experience section
+        r'\b(education|university|college|degree|bachelor|master)\b',  # education
+        r'\b(skills|proficient|expertise|technologies)\b',    # skills section
+    ]
+    import re
+    text_lower = resume_text.lower()
+    for pattern in completeness_checks:
+        if re.search(pattern, text_lower):
+            completeness += 20
+    completeness = min(completeness, 100)
+
+    total = (skill_score * 0.40) + (text_sim * 0.40) + (completeness * 0.20)
+    return round(min(total, 100.0), 1)
+
+
+def generate_improvement_suggestions(resume_text: str, jd_text: str, missing_skills: list, category: str) -> dict:
+    """
+    Generate structured improvement suggestions and a copyable AI prompt.
+    Returns a dict with sections: suggestions (list), prompt (str), priority_areas (list).
+    """
+    import re
+
+    text_lower = resume_text.lower()
+
+    # Detect which resume sections are missing or weak
+    missing_sections = []
+    has_email = bool(re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z]{2,}', resume_text))
+    has_phone = bool(re.search(r'\b(?:\+?\d[\d\s\-().]{7,})\b', resume_text))
+    has_education = bool(re.search(r'\b(education|university|college|degree|bachelor|master|b\.?s\.?|m\.?s\.?)\b', text_lower))
+    has_experience = bool(re.search(r'\b(experience|worked|years|built|developed|designed|led|managed)\b', text_lower))
+    has_summary = bool(re.search(r'\b(summary|objective|profile|about me|overview)\b', text_lower))
+    has_certifications = bool(re.search(r'\b(certified|certification|certificate|aws certified|google certified|pmp|coursera|udemy)\b', text_lower))
+    has_github = bool(re.search(r'\b(github|gitlab|portfolio|projects)\b', text_lower))
+    has_quantified = bool(re.search(r'\b(\d+%|\d+ percent|increased|decreased|reduced|improved by|grew)\b', text_lower))
+
+    suggestions = []
+    priority_areas = []
+
+    if not has_email or not has_phone:
+        suggestions.append({
+            "section": "Contact Information",
+            "priority": "High",
+            "action": "Add a professional email address and phone number at the top of your resume."
+        })
+        priority_areas.append("Contact Information")
+
+    if not has_summary:
+        suggestions.append({
+            "section": "Professional Summary",
+            "priority": "High",
+            "action": f"Add a 3-4 sentence professional summary highlighting your experience as a {category}, key strengths, and career goals."
+        })
+        priority_areas.append("Professional Summary")
+
+    if not has_experience:
+        suggestions.append({
+            "section": "Work Experience",
+            "priority": "High",
+            "action": "Add detailed work experience entries with company name, role title, dates, and bullet points describing your responsibilities and achievements."
+        })
+        priority_areas.append("Work Experience")
+
+    if not has_quantified:
+        suggestions.append({
+            "section": "Impact Metrics",
+            "priority": "Medium",
+            "action": "Quantify your achievements. E.g., 'Reduced page load time by 40%', 'Managed a team of 5 engineers', 'Increased conversion rate by 15%'."
+        })
+        priority_areas.append("Impact Metrics")
+
+    if not has_education:
+        suggestions.append({
+            "section": "Education",
+            "priority": "Medium",
+            "action": "Add your educational background including degree, institution name, graduation year, and any relevant coursework or GPA."
+        })
+        priority_areas.append("Education")
+
+    if missing_skills:
+        top_missing = missing_skills[:8]
+        suggestions.append({
+            "section": "Technical Skills",
+            "priority": "High",
+            "action": f"Add the following skills that are required by the job description: {', '.join(top_missing)}. Include them in your Skills section and demonstrate usage in your work experience."
+        })
+        priority_areas.append("Technical Skills")
+
+    if not has_certifications:
+        suggestions.append({
+            "section": "Certifications",
+            "priority": "Low",
+            "action": f"Consider adding relevant certifications for a {category} role (e.g., AWS Certified Developer, Google Cloud, Meta Developer Certification, etc.)."
+        })
+
+    if not has_github:
+        suggestions.append({
+            "section": "Portfolio / Projects",
+            "priority": "Medium",
+            "action": "Add a link to your GitHub, portfolio, or personal projects. Include 2-3 project descriptions with tech stack used and outcomes."
+        })
+        priority_areas.append("Portfolio / Projects")
+
+    # Build the copyable ChatGPT prompt
+    jd_snippet = jd_text[:800].strip() if jd_text else "Not provided"
+    resume_snippet = resume_text[:1200].strip()
+    missing_str = ", ".join(missing_skills[:10]) if missing_skills else "None identified"
+    missing_sections_str = ", ".join(priority_areas) if priority_areas else "None"
+
+    prompt = f"""You are an expert resume writer. I need you to help me improve my resume for a specific job application.
+
+=== JOB DESCRIPTION ===
+{jd_snippet}
+
+=== MY CURRENT RESUME ===
+{resume_snippet}
+
+=== WHAT'S MISSING ===
+- Missing skills required by the JD: {missing_str}
+- Weak/missing resume sections: {missing_sections_str}
+
+=== INSTRUCTIONS ===
+Please rewrite and improve my resume by:
+1. Adding a strong Professional Summary (3-4 sentences) tailored to this job
+2. Incorporating the missing skills ({missing_str}) into the Skills section and Work Experience naturally
+3. Strengthening my Work Experience bullet points with quantified achievements (numbers, percentages, scale)
+4. Adding any missing sections (Education, Certifications, GitHub/Portfolio links if relevant)
+5. Keeping a clean, ATS-friendly format
+
+Please return the COMPLETE improved resume text that I can copy directly. Do NOT use markdown formatting or asterisks — use plain text with clear section headers in ALL CAPS."""
+
+    return {
+        "suggestions": suggestions,
+        "prompt": prompt,
+        "priority_areas": priority_areas,
+        "missing_sections": {
+            "has_email": has_email,
+            "has_phone": has_phone,
+            "has_education": has_education,
+            "has_experience": has_experience,
+            "has_summary": has_summary,
+            "has_certifications": has_certifications,
+            "has_github": has_github,
+            "has_quantified_metrics": has_quantified,
+        }
+    }
+
+
 if __name__ == "__main__":
-    # Test script execution
     print("Testing ML model training...")
     train_model()
-    
+
     test_text = "I am a Senior Software Developer with expertise in React, Node, Express, MongoDB, HTML, CSS, JavaScript, TypeScript, AWS, CI/CD, Docker and Git."
     category, confidence = predict_category(test_text)
     print(f"Test prediction: '{category}' with {confidence}% confidence.")
-    
+
     jd = "We are hiring a Full Stack Developer with React, Node.js, and TypeScript skills."
     score = calculate_match_score(test_text, jd)
-    print(f"Similarity Score: {score}%")
+    print(f"Text Similarity Score: {score}%")
+
+    sat = calculate_satisfaction_score(test_text, jd, ["React", "Node.js", "TypeScript"], ["React", "Node.js", "TypeScript", "Docker"])
+    print(f"Weighted Satisfaction Score: {sat}%")

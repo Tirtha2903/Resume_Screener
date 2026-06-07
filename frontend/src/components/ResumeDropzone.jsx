@@ -1,162 +1,98 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileText, Trash2, AlertCircle } from 'lucide-react';
+import { UploadCloud, FileText, X, AlertCircle } from 'lucide-react';
 
 export default function ResumeDropzone({ files, setFiles }) {
-  const [isDragActive, setIsDragActive] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState('');
-  const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setIsDragActive(true);
-    } else if (e.type === "dragleave") {
-      setIsDragActive(false);
-    }
-  };
-
-  const validateAndAddFiles = (uploadedFiles) => {
+  const addFiles = (incoming) => {
     setError('');
-    const validExtensions = ['.pdf', '.docx', '.txt'];
-    const newFiles = [];
+    const valid = ['.pdf', '.docx', '.txt'];
+    const toAdd = [];
 
-    for (let i = 0; i < uploadedFiles.length; i++) {
-      const file = uploadedFiles[i];
-      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-      
-      if (!validExtensions.includes(ext)) {
-        setError(`Unsupported file type: ${file.name}. Only PDF, DOCX, and TXT are supported.`);
+    for (const file of incoming) {
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+      if (!valid.includes(ext)) {
+        setError(`"${file.name}" is not supported. Please upload PDF, DOCX, or TXT files.`);
         continue;
       }
-      
-      // Limit file size to 10MB
       if (file.size > 10 * 1024 * 1024) {
-        setError(`File too large: ${file.name}. Max size is 10MB.`);
+        setError(`"${file.name}" exceeds 10 MB.`);
         continue;
       }
-
-      // Avoid duplicates by name
-      if (files.some(f => f.name === file.name)) {
-        continue;
-      }
-
-      newFiles.push(file);
+      if (files.some(f => f.name === file.name)) continue;
+      toAdd.push(file);
     }
 
-    if (newFiles.length > 0) {
-      setFiles((prev) => [...prev, ...newFiles]);
-    }
+    if (toAdd.length) setFiles(prev => [...prev, ...toAdd]);
   };
 
-  const handleDrop = (e) => {
+  const onDrag = (e) => { e.preventDefault(); e.stopPropagation(); };
+  const onDragEnter = (e) => { e.preventDefault(); setIsDragging(true); };
+  const onDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+  const onDrop = (e) => {
     e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      validateAndAddFiles(e.dataTransfer.files);
-    }
+    setIsDragging(false);
+    if (e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
   };
+  const onChange = (e) => { if (e.target.files.length) addFiles(Array.from(e.target.files)); };
+  const remove = (i) => setFiles(prev => prev.filter((_, idx) => idx !== i));
 
-  const handleChange = (e) => {
-    e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      validateAndAddFiles(e.target.files);
-    }
-  };
-
-  const removeFile = (indexToRemove) => {
-    setFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
-  };
-
-  const triggerInput = () => {
-    fileInputRef.current.click();
-  };
-
-  const formatSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  const fmt = (b) => b < 1024 ? `${b} B` : b < 1048576 ? `${(b/1024).toFixed(1)} KB` : `${(b/1048576).toFixed(1)} MB`;
 
   return (
-    <div className="form-group">
-      <label className="form-label">Upload Resumes</label>
-      
-      <div 
-        className={`dropzone-container ${isDragActive ? 'active' : ''}`}
-        onDragEnter={handleDrag}
-        onDragOver={handleDrag}
-        onDragLeave={handleDrag}
-        onDrop={handleDrop}
-        onClick={triggerInput}
+    <div className="field-group">
+      <label className="field-label">Resume Files</label>
+
+      <div
+        className={`dropzone${isDragging ? ' active' : ''}`}
+        onDragEnter={onDragEnter}
+        onDragOver={onDrag}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => inputRef.current.click()}
       >
-        <input 
-          ref={fileInputRef}
+        <input
+          ref={inputRef}
           type="file"
           multiple
-          className="hidden-input"
-          style={{ display: 'none' }}
-          onChange={handleChange}
           accept=".pdf,.docx,.txt"
+          style={{ display: 'none' }}
+          onChange={onChange}
         />
-        
         <div className="dropzone-icon">
-          <UploadCloud size={24} />
+          <UploadCloud size={20} />
         </div>
-        
-        <p style={{ fontWeight: 600, fontSize: '0.9rem', color: '#fff' }}>
-          Drag & Drop files here or <span style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>browse</span>
+        <p className="dropzone-heading">
+          <span className="dropzone-link">Browse files</span>&nbsp;or drag and drop
         </p>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          Supports PDF, DOCX, TXT (Max 10MB per file)
-        </p>
+        <p className="dropzone-sub">PDF, DOCX, TXT · Max 10 MB each</p>
       </div>
 
       {error && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '0.5rem', 
-          color: 'var(--color-danger)', 
-          fontSize: '0.8rem',
-          marginTop: '0.5rem',
-          padding: '0.5rem 0.75rem',
-          background: 'rgba(239, 68, 68, 0.05)',
-          border: '1px solid rgba(239, 68, 68, 0.15)',
-          borderRadius: '8px'
-        }}>
-          <AlertCircle size={16} />
+        <div className="alert alert-error" style={{ marginTop: 8 }}>
+          <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
           <span>{error}</span>
         </div>
       )}
 
       {files.length > 0 && (
         <div className="file-list">
-          <p className="form-label" style={{ fontSize: '0.7rem', marginTop: '0.5rem' }}>
-            Selected Files ({files.length})
-          </p>
-          {files.map((file, index) => (
-            <div key={index} className="file-item animate-fade-in">
-              <div className="file-info">
-                <FileText size={16} style={{ color: 'var(--color-primary)' }} />
-                <span className="file-name" title={file.name}>{file.name}</span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-dark)' }}>
-                  ({formatSize(file.size)})
-                </span>
+          {files.map((file, i) => (
+            <div key={i} className="file-item animate-in">
+              <div className="file-item-name">
+                <FileText size={14} style={{ color: 'var(--brand)', flexShrink: 0 }} />
+                <span>{file.name}</span>
+                <span className="file-item-size">({fmt(file.size)})</span>
               </div>
-              <button 
-                type="button" 
-                className="btn-remove-file"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFile(index);
-                }}
+              <button
+                type="button"
+                className="btn-icon"
+                onClick={(e) => { e.stopPropagation(); remove(i); }}
+                title="Remove file"
               >
-                <Trash2 size={14} />
+                <X size={13} />
               </button>
             </div>
           ))}

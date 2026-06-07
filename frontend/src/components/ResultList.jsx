@@ -1,166 +1,171 @@
 import React, { useState } from 'react';
-import { Mail, Phone, ExternalLink, SlidersHorizontal, Search, ArrowUpDown } from 'lucide-react';
+import { Mail, Search, Zap } from 'lucide-react';
 
-export default function ResultList({ results, onSelectCandidate }) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('All');
-  const [sortBy, setSortBy] = useState('score-desc');
+function scoreClass(s) {
+  if (s >= 70) return 'high';
+  if (s >= 40) return 'medium';
+  return 'low';
+}
 
-  // Extract all unique categories present in the results for the filter dropdown
-  const uniqueCategories = ['All', ...new Set(results.map(r => r.category))];
+export default function ResultList({ results, onSelectCandidate, onImprove }) {
+  const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState('All');
+  const [sort, setSort] = useState('score-desc');
 
-  // Filtering Logic
-  const filteredResults = results.filter(candidate => {
-    const matchesSearch = 
-      candidate.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-    const matchesCategory = categoryFilter === 'All' || candidate.category === categoryFilter;
-    
-    return matchesSearch && matchesCategory;
-  });
+  const cats = ['All', ...new Set(results.map(r => r.category))];
 
-  // Sorting Logic
-  const sortedResults = [...filteredResults].sort((a, b) => {
-    if (sortBy === 'score-desc') return b.match_score - a.match_score;
-    if (sortBy === 'score-asc') return a.match_score - b.match_score;
-    if (sortBy === 'confidence-desc') return b.confidence - a.confidence;
-    if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
-    return 0;
-  });
-
-  const getScoreClass = (score) => {
-    if (score >= 70) return 'high';
-    if (score >= 40) return 'medium';
-    return 'low';
-  };
+  const filtered = results
+    .filter(r => {
+      const q = search.toLowerCase();
+      return (
+        r.name.toLowerCase().includes(q) ||
+        r.skills.some(s => s.toLowerCase().includes(q))
+      ) && (catFilter === 'All' || r.category === catFilter);
+    })
+    .sort((a, b) => {
+      if (sort === 'score-desc') return b.satisfaction_score - a.satisfaction_score;
+      if (sort === 'score-asc')  return a.satisfaction_score - b.satisfaction_score;
+      if (sort === 'name-asc')   return a.name.localeCompare(b.name);
+      return 0;
+    });
 
   return (
-    <div className="glass-card animate-fade-in" style={{ gridColumn: 'span 2' }}>
-      <div className="results-header">
-        <h2 className="card-title">
-          <SlidersHorizontal size={18} style={{ color: 'var(--color-primary)' }} />
-          Screening Analysis
-        </h2>
-        
-        <div className="filter-bar">
-          {/* Search box */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Search candidate/skill..."
-              className="select-input"
-              style={{ paddingLeft: '28px', width: '200px' }}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+    <div className="card animate-in" style={{ gridColumn: 'span 2' }}>
+      <div className="card-header-bar">
+        <div className="results-toolbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <p className="card-title">Candidates</p>
+            <span className="badge badge-gray">{filtered.length} of {results.length}</span>
           </div>
 
-          {/* Category Filter */}
-          <select 
-            className="select-input"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          >
-            <option value="All">All Profiles</option>
-            {uniqueCategories.filter(cat => cat !== 'All').map((cat, idx) => (
-              <option key={idx} value={cat}>{cat}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* Search */}
+            <div className="search-wrap">
+              <Search size={13} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Name or skill…"
+                className="search-input"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
 
-          {/* Sorting Option */}
-          <select 
-            className="select-input"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <option value="score-desc">Score: High to Low</option>
-            <option value="score-asc">Score: Low to High</option>
-            <option value="confidence-desc">Confidence: High to Low</option>
-            <option value="name-asc">Name: A-Z</option>
-          </select>
+            {/* Category filter */}
+            <select
+              className="field-select"
+              style={{ width: 'auto', padding: '6px 10px' }}
+              value={catFilter}
+              onChange={e => setCatFilter(e.target.value)}
+            >
+              {cats.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            {/* Sort */}
+            <select
+              className="field-select"
+              style={{ width: 'auto', padding: '6px 10px' }}
+              value={sort}
+              onChange={e => setSort(e.target.value)}
+            >
+              <option value="score-desc">Score ↓</option>
+              <option value="score-asc">Score ↑</option>
+              <option value="name-asc">Name A-Z</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {sortedResults.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-          No candidates match your search filters.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {/* Table Header for Desktop */}
-          <div className="candidate-row" style={{ 
-            background: 'rgba(255, 255, 255, 0.03)', 
-            border: 'none', 
-            cursor: 'default',
-            fontWeight: 600,
-            fontSize: '0.8rem',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            letterSpacing: '0.5px'
-          }}>
-            <div>Candidate Info</div>
-            <div>ML Predicted Field</div>
-            <div>Prediction Conf.</div>
-            <div>JD Fit Score</div>
-            <div style={{ textAlign: 'right', paddingRight: '0.5rem' }}>Inspection</div>
-          </div>
+      <div style={{ padding: '0 20px 20px' }}>
+        {filtered.length === 0 ? (
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 0', fontSize: '0.875rem' }}>
+            No candidates match your filters.
+          </p>
+        ) : (
+          <div className="candidate-table">
+            {/* Header */}
+            <div className="candidate-header">
+              <span>Candidate</span>
+              <span>Role</span>
+              <span>Confidence</span>
+              <span>Fit Score</span>
+              <span>Skills Match</span>
+              <span></span>
+            </div>
 
-          <div className="candidate-list">
-            {sortedResults.map((candidate, idx) => (
-              <div 
-                key={idx} 
-                className="candidate-row animate-fade-in"
-                style={{ animationDelay: `${idx * 0.05}s` }}
-                onClick={() => onSelectCandidate(candidate)}
-              >
-                {/* Candidate Column */}
-                <div className="candidate-profile">
-                  <div className="candidate-name">{candidate.name}</div>
-                  <div className="candidate-contact">
-                    <Mail size={12} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{candidate.email}</span>
+            {/* Rows */}
+            {filtered.map((r, i) => {
+              const cls = scoreClass(r.satisfaction_score);
+              const matchedCount = r.analysis.matched_skills.length;
+              const totalJDSkills = matchedCount + r.analysis.missing_skills.length;
+
+              return (
+                <div
+                  key={i}
+                  className="candidate-row animate-in"
+                  style={{ animationDelay: `${i * 0.04}s` }}
+                  onClick={() => onSelectCandidate(r)}
+                >
+                  {/* Name + email */}
+                  <div>
+                    <div className="cand-name">{r.name}</div>
+                    <div className="cand-email">
+                      <Mail size={11} />
+                      {r.email}
+                    </div>
+                  </div>
+
+                  {/* Category */}
+                  <div>
+                    <span className="badge badge-brand">{r.category}</span>
+                  </div>
+
+                  {/* Confidence */}
+                  <div style={{ fontSize: '0.82rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                    {r.confidence}%
+                  </div>
+
+                  {/* Fit score */}
+                  <div>
+                    <span className={`score-num ${cls}`}>{Math.round(r.satisfaction_score)}%</span>
+                    <div className="progress-track" style={{ marginTop: 5, width: 70 }}>
+                      <div className={`progress-fill ${cls}`} style={{ width: `${r.satisfaction_score}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Matched skills */}
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {totalJDSkills > 0 ? (
+                      <>{matchedCount} / {totalJDSkills} skills</>
+                    ) : (
+                      <span style={{ color: 'var(--text-faint)' }}>No JD provided</span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={e => { e.stopPropagation(); onSelectCandidate(r); }}
+                    >
+                      Details
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: 'var(--brand-light)', color: 'var(--brand)', border: '1px solid var(--brand-light2)' }}
+                      onClick={e => { e.stopPropagation(); onImprove(r); }}
+                      title="Open improvement mode"
+                    >
+                      <Zap size={12} />
+                      Improve
+                    </button>
                   </div>
                 </div>
-
-                {/* Category Column */}
-                <div>
-                  <span className="category-tag">{candidate.category}</span>
-                </div>
-
-                {/* Prediction Confidence */}
-                <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                  {candidate.confidence}%
-                </div>
-
-                {/* Match Score */}
-                <div className={`score-badge ${getScoreClass(candidate.match_score)}`}>
-                  <div className={`score-circle ${getScoreClass(candidate.match_score)}`}>
-                    {Math.round(candidate.match_score)}
-                  </div>
-                  <span style={{ fontSize: '0.85rem' }}>Match</span>
-                </div>
-
-                {/* Action Column */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button 
-                    className="btn-secondary" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectCandidate(candidate);
-                    }}
-                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}
-                  >
-                    Details
-                    <ExternalLink size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

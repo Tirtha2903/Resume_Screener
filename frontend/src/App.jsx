@@ -1,286 +1,265 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Play, Cpu, AlertTriangle, FileCheck, CheckCircle2, RotateCw } from 'lucide-react';
-import ResumeDropzone from './components/ResumeDropzone';
-import ResultList from './components/ResultList';
-import DetailModal from './components/DetailModal';
-import Dashboard from './components/Dashboard';
+import { FileSearch, Play, RotateCw, AlertTriangle, RefreshCw, Sun, Moon } from 'lucide-react';
+import ResumeDropzone   from './components/ResumeDropzone';
+import ResultList       from './components/ResultList';
+import DetailModal      from './components/DetailModal';
+import Dashboard        from './components/Dashboard';
+import ImprovementPanel from './components/ImprovementPanel';
 
+/* ── Theme helper ─────────────────────────────────────────── */
+function getInitialTheme() {
+  try {
+    const saved = localStorage.getItem('resume-ai-theme');
+    if (saved) return saved;
+  } catch {}
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('resume-ai-theme', theme); } catch {}
+}
+
+/* ── App ─────────────────────────────────────────────────── */
 export default function App() {
-  const [jobDescription, setJobDescription] = useState('');
-  const [files, setFiles] = useState([]);
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [apiOnline, setApiOnline] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [error, setError] = useState('');
-  const [isRetraining, setIsRetraining] = useState(false);
-  const [trainMessage, setTrainMessage] = useState('');
+  const [theme, setTheme]             = useState(getInitialTheme);
+  const [jobDescription, setJobDesc]  = useState('');
+  const [files, setFiles]             = useState([]);
+  const [results, setResults]         = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [apiOnline, setApiOnline]     = useState(false);
+  const [selected, setSelected]       = useState(null);
+  const [improving, setImproving]     = useState(null);
+  const [error, setError]             = useState('');
+  const [retraining, setRetraining]   = useState(false);
+  const [trainMsg, setTrainMsg]       = useState('');
 
-  // Check backend server status on load
-  useEffect(() => {
-    checkBackendHealth();
-  }, []);
+  // Apply theme on mount + change
+  useEffect(() => { applyTheme(theme); }, [theme]);
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
-  const checkBackendHealth = async () => {
+  useEffect(() => { checkHealth(); }, []);
+
+  async function checkHealth() {
     try {
-      const response = await fetch('http://localhost:8000/api/health');
-      if (response.ok) {
-        setApiOnline(true);
-        setError('');
-      } else {
-        setApiOnline(false);
-      }
-    } catch (err) {
-      setApiOnline(false);
-    }
-  };
+      const r = await fetch('http://localhost:8000/api/health');
+      setApiOnline(r.ok);
+    } catch { setApiOnline(false); }
+  }
 
-  const handleScreen = async (e) => {
+  async function handleScreen(e) {
     e.preventDefault();
-    if (files.length === 0) {
-      setError('Please upload at least one resume file.');
-      return;
-    }
-    
+    if (!files.length) { setError('Please upload at least one resume file.'); return; }
     setError('');
     setLoading(true);
-    setSelectedCandidate(null);
-
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
-    formData.append('job_description', jobDescription);
-
+    setSelected(null);
+    setImproving(null);
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    fd.append('job_description', jobDescription);
     try {
-      const response = await fetch('http://localhost:8000/api/screen', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to screen resumes.');
-      }
-
-      const data = await response.json();
+      const res = await fetch('http://localhost:8000/api/screen', { method: 'POST', body: fd });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Screening failed.'); }
+      const data = await res.json();
       setResults(data.results || []);
     } catch (err) {
-      setError(err.message || 'Error communicating with the screening server. Ensure backend is running.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setError(err.message || 'Could not reach the backend. Make sure the server is running.');
+    } finally { setLoading(false); }
+  }
 
-  const handleRetrain = async () => {
-    setIsRetraining(true);
-    setTrainMessage('');
+  async function handleRetrain() {
+    setRetraining(true);
     try {
-      const response = await fetch('http://localhost:8000/api/train', {
-        method: 'POST',
-      });
-      if (response.ok) {
-        setTrainMessage('Model retrained successfully!');
-        // Clear message after 3 seconds
-        setTimeout(() => setTrainMessage(''), 3000);
-      } else {
-        setError('Failed to retrain model.');
-      }
-    } catch (err) {
-      setError('Connection error occurred while training model.');
-    } finally {
-      setIsRetraining(false);
-    }
-  };
+      const r = await fetch('http://localhost:8000/api/train', { method: 'POST' });
+      if (r.ok) { setTrainMsg('Model retrained.'); setTimeout(() => setTrainMsg(''), 3000); }
+    } catch { setError('Could not retrain model.'); }
+    finally { setRetraining(false); }
+  }
 
+  /* ── Improvement mode ────────────────────────────────────── */
+  if (improving) {
+    return (
+      <div className="app-wrap">
+        <header className="app-header">
+          <button
+            className="logo"
+            style={{ border: 'none', background: 'none', cursor: 'pointer' }}
+            onClick={() => setImproving(null)}
+          >
+            <div className="logo-mark"><FileSearch size={16} /></div>
+            <span className="logo-name">ResumeAI</span>
+          </button>
+          <div className="header-right">
+            <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setImproving(null)}
+              style={{ gap: 5 }}
+            >
+              ← Back to results
+            </button>
+          </div>
+        </header>
+        <ImprovementPanel
+          candidate={improving}
+          jobDescription={jobDescription}
+          onBack={() => setImproving(null)}
+        />
+      </div>
+    );
+  }
+
+  /* ── Main screen ─────────────────────────────────────────── */
   return (
-    <div className="app-container">
-      {/* Premium Header */}
+    <div className="app-wrap">
       <header className="app-header">
-        <div className="logo-section">
-          <div className="logo-icon">
-            <Sparkles size={22} fill="currentColor" />
-          </div>
-          <div className="logo-text">
-            <h1>Screener.AI</h1>
-            <p>Machine Learning Resume Screener & Classifier</p>
-          </div>
+        <div className="logo">
+          <div className="logo-mark"><FileSearch size={16} /></div>
+          <span className="logo-name">ResumeAI</span>
+          <span className="logo-tagline">· ML-powered screening</span>
         </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="header-right">
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
           {apiOnline ? (
-            <div className="status-badge">
-              <span className="status-indicator"></span>
-              ML Core Online
+            <div className="status-pill online">
+              <div className="status-dot online" />
+              API online
             </div>
           ) : (
-            <div className="status-badge" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-              <span className="status-indicator" style={{ backgroundColor: 'var(--color-danger)', boxShadow: '0 0 8px var(--color-danger)' }}></span>
-              Offline - Reconnecting
+            <div className="status-pill offline">
+              <div className="status-dot offline" />
+              API offline
             </div>
           )}
         </div>
       </header>
 
-      {/* Main content grid */}
-      <main className="main-grid">
-        {/* Sidebar Controls */}
-        <section className="glass-card animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <h2 className="card-title">
-            <Cpu size={18} style={{ color: 'var(--color-primary)' }} />
-            Screener Engine
-          </h2>
-
-          <form onSubmit={handleScreen} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Job Description input */}
-            <div className="form-group">
-              <label className="form-label">Target Job Description (JD)</label>
-              <textarea
-                placeholder="Paste role responsibilities, required skills, and experience criteria here to calculate keyword alignment..."
-                className="text-area-input"
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-              />
+      <div className="main-layout">
+        {/* ── Sidebar ───────────────────────────────────────── */}
+        <aside>
+          <div className="card">
+            <div className="card-header-bar">
+              <p className="card-title">New Screening</p>
+              <p className="card-subtitle">Upload resumes and a job description to rank and classify candidates.</p>
             </div>
+            <div className="card-padded">
+              <form onSubmit={handleScreen}>
+                <div className="field-group">
+                  <label className="field-label">Job Description</label>
+                  <textarea
+                    className="field-input"
+                    placeholder="Paste the role description, required skills, and experience here…"
+                    value={jobDescription}
+                    onChange={e => setJobDesc(e.target.value)}
+                  />
+                </div>
 
-            {/* Dropzone component */}
-            <ResumeDropzone files={files} setFiles={setFiles} />
+                <ResumeDropzone files={files} setFiles={setFiles} />
 
-            {/* Error notifications */}
-            {error && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem', 
-                color: 'var(--color-danger)', 
-                fontSize: '0.8rem',
-                padding: '0.75rem',
-                background: 'rgba(239, 68, 68, 0.05)',
-                border: '1px solid rgba(239, 68, 68, 0.15)',
-                borderRadius: '8px'
-              }}>
-                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-                <span>{error}</span>
-              </div>
-            )}
+                {error && (
+                  <div className="alert alert-error" style={{ marginBottom: 12, marginTop: 4 }}>
+                    <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span>{error}</span>
+                  </div>
+                )}
 
-            {/* Retrain model notice */}
-            {trainMessage && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem', 
-                color: 'var(--color-success)', 
-                fontSize: '0.8rem',
-                padding: '0.75rem',
-                background: 'rgba(16, 185, 129, 0.05)',
-                border: '1px solid rgba(16, 185, 129, 0.15)',
-                borderRadius: '8px'
-              }}>
-                <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
-                <span>{trainMessage}</span>
-              </div>
-            )}
+                {trainMsg && (
+                  <div className="alert alert-success" style={{ marginBottom: 12, marginTop: 4 }}>
+                    <span>{trainMsg}</span>
+                  </div>
+                )}
 
-            {/* Action Buttons */}
-            <button 
-              type="submit" 
-              className="btn-primary" 
-              disabled={loading || files.length === 0}
-            >
-              {loading ? (
-                <>
-                  <RotateCw size={16} className="animate-spin" style={{ animation: 'spin 1.5s linear infinite' }} />
-                  Processing Resumes...
-                </>
-              ) : (
-                <>
-                  <Play size={16} fill="currentColor" />
-                  Analyze Candidates
-                </>
-              )}
-            </button>
-          </form>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={loading || !files.length}
+                  style={{ marginBottom: 8, marginTop: 4 }}
+                >
+                  {loading
+                    ? <><div className="spinner spinner-sm" /> Analysing…</>
+                    : <><Play size={13} fill="currentColor" /> Analyse Candidates</>
+                  }
+                </button>
 
-          {/* Auxiliary Operations */}
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              style={{ width: '100%', justifyContent: 'center' }}
-              disabled={isRetraining}
-              onClick={handleRetrain}
-            >
-              {isRetraining ? 'Training System...' : 'Retrain ML Classification Model'}
-            </button>
+                {results.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-full"
+                    onClick={() => { setResults([]); setFiles([]); setError(''); }}
+                    style={{ gap: 5 }}
+                  >
+                    <RefreshCw size={12} /> Clear &amp; start over
+                  </button>
+                )}
+              </form>
+
+              <hr className="divider" />
+
+              <button
+                type="button"
+                className="btn btn-ghost btn-full"
+                onClick={handleRetrain}
+                disabled={retraining}
+                style={{ fontSize: '0.74rem', color: 'var(--text-faint)' }}
+              >
+                {retraining
+                  ? <><div className="spinner spinner-sm" /> Training…</>
+                  : <><RotateCw size={12} /> Retrain ML model</>
+                }
+              </button>
+            </div>
           </div>
-        </section>
+        </aside>
 
-        {/* Content Panel */}
-        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignContent: 'start' }}>
-          
+        {/* ── Content area ──────────────────────────────────── */}
+        <main>
           {loading && (
-            <div className="glass-card animate-fade-in" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '350px', gap: '1.25rem' }}>
-              <div style={{ 
-                width: '64px', 
-                height: '64px', 
-                border: '4px solid rgba(99, 102, 241, 0.1)', 
-                borderTopColor: 'var(--color-primary)', 
-                borderRadius: '50%', 
-                animation: 'spin 1s cubic-bezier(0.55, 0.055, 0.675, 0.19) infinite' 
-              }} />
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 360, gap: 14 }}>
+              <div className="spinner spinner-md" />
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontWeight: 600, fontSize: '1.05rem', color: '#fff' }}>Extracting Profile Metadata</p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Running natural language parsing & predictive matching algorithms...
-                </p>
+                <p style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 3, fontSize: '0.875rem' }}>Processing resumes…</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Running ML classification and skills extraction</p>
               </div>
             </div>
           )}
 
           {!loading && results.length === 0 && (
-            <div className="glass-card animate-fade-in" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '350px' }}>
-              <div className="dashboard-empty">
-                <div className="empty-icon">
-                  <FileCheck size={28} />
-                </div>
-                <h3 style={{ color: '#fff', fontSize: '1.1rem', fontWeight: 600 }}>Ready for Screening</h3>
-                <p style={{ maxWidth: '380px', fontSize: '0.85rem', lineHeight: '1.5' }}>
-                  Upload candidate resumes (PDF, DOCX, TXT) and enter a target Job Description to generate scores, predict categories, and extract key metrics.
+            <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 360 }}>
+              <div className="empty-state">
+                <div className="empty-icon"><FileSearch size={22} /></div>
+                <p className="empty-heading">No results yet</p>
+                <p className="empty-sub">
+                  Upload one or more resumes and paste a job description, then click <strong>Analyse Candidates</strong>.
+                  You'll get a ranked list with ML-predicted roles and a skills gap breakdown.
                 </p>
               </div>
             </div>
           )}
 
           {!loading && results.length > 0 && (
-            <>
-              {/* Analytics metrics & charts */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <Dashboard results={results} />
-              
-              {/* Table/Card breakdown */}
-              <ResultList results={results} onSelectCandidate={setSelectedCandidate} />
-            </>
+              <ResultList
+                results={results}
+                onSelectCandidate={setSelected}
+                onImprove={setImproving}
+              />
+            </div>
           )}
+        </main>
+      </div>
 
-        </section>
-      </main>
-
-      {/* Candidate detail drawer popup */}
-      {selectedCandidate && (
-        <DetailModal 
-          candidate={selectedCandidate} 
-          onClose={() => setSelectedCandidate(null)} 
+      {selected && (
+        <DetailModal
+          candidate={selected}
+          onClose={() => setSelected(null)}
+          onImprove={(c) => { setSelected(null); setImproving(c); }}
         />
       )}
-
-      {/* Embedded CSS animation helpers */}
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

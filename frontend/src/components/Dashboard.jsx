@@ -1,137 +1,113 @@
 import React from 'react';
-import { BarChart3, PieChart, Users, Award, ShieldAlert, CheckSquare } from 'lucide-react';
+import { Users, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
+
+function scoreClass(s) {
+  if (s >= 70) return 'high';
+  if (s >= 40) return 'medium';
+  return 'low';
+}
 
 export default function Dashboard({ results }) {
   if (!results || results.length === 0) return null;
 
-  // Calculate metrics
-  const totalResumes = results.length;
-  
-  const averageScore = results.reduce((acc, curr) => acc + curr.match_score, 0) / totalResumes;
-  
-  const highFitCount = results.filter(r => r.match_score >= 70).length;
-  const mediumFitCount = results.filter(r => r.match_score >= 40 && r.match_score < 70).length;
-  const lowFitCount = results.filter(r => r.match_score < 40).length;
+  const total = results.length;
+  const avg   = results.reduce((a, r) => a + r.satisfaction_score, 0) / total;
+  const high  = results.filter(r => r.satisfaction_score >= 70).length;
+  const low   = results.filter(r => r.satisfaction_score < 40).length;
 
-  // Category counts
-  const categoryCounts = {};
-  results.forEach(r => {
-    categoryCounts[r.category] = (categoryCounts[r.category] || 0) + 1;
-  });
+  // Category breakdown
+  const cats = {};
+  results.forEach(r => { cats[r.category] = (cats[r.category] || 0) + 1; });
+  const catList = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  const maxCat  = catList[0]?.[1] || 1;
 
-  const categoryData = Object.entries(categoryCounts)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-
-  // Score distribution ranges
-  const scoreRanges = [
-    { label: '0-20%', count: results.filter(r => r.match_score <= 20).length },
-    { label: '21-40%', count: results.filter(r => r.match_score > 20 && r.match_score <= 40).length },
-    { label: '41-60%', count: results.filter(r => r.match_score > 40 && r.match_score <= 60).length },
-    { label: '61-80%', count: results.filter(r => r.match_score > 60 && r.match_score <= 80).length },
-    { label: '81-100%', count: results.filter(r => r.match_score > 80).length }
+  // Score distribution buckets
+  const buckets = [
+    { label: '0-20',   count: results.filter(r => r.satisfaction_score <= 20).length },
+    { label: '21-40',  count: results.filter(r => r.satisfaction_score > 20 && r.satisfaction_score <= 40).length },
+    { label: '41-60',  count: results.filter(r => r.satisfaction_score > 40 && r.satisfaction_score <= 60).length },
+    { label: '61-80',  count: results.filter(r => r.satisfaction_score > 60 && r.satisfaction_score <= 80).length },
+    { label: '81-100', count: results.filter(r => r.satisfaction_score > 80).length },
   ];
-
-  const maxRangeCount = Math.max(...scoreRanges.map(r => r.count), 1);
+  const maxBucket = Math.max(...buckets.map(b => b.count), 1);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', gridColumn: 'span 2' }}>
-      
-      {/* Metrics Row */}
-      <div className="analytics-grid">
-        <div className="stats-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="stats-label">Total Resumes Screened</span>
-            <Users size={16} style={{ color: 'var(--color-primary)' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, gridColumn: 'span 2' }}>
+      {/* Stat cards */}
+      <div className="stats-row">
+        <div className="stat-card">
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Users size={12} /> Total Screened
           </div>
-          <span className="stats-value">{totalResumes}</span>
+          <div className="stat-value">{total}</div>
         </div>
-
-        <div className="stats-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="stats-label">Average Job Description Match</span>
-            <Award size={16} style={{ color: 'var(--color-success)' }} />
+        <div className="stat-card">
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <TrendingUp size={12} /> Avg. Fit Score
           </div>
-          <span className="stats-value" style={{ color: averageScore >= 70 ? 'var(--color-success)' : averageScore >= 40 ? 'var(--color-warning)' : 'var(--color-danger)' }}>
-            {Math.round(averageScore)}%
-          </span>
+          <div className={`stat-value score-num ${scoreClass(avg)}`}>{Math.round(avg)}%</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <CheckCircle2 size={12} /> Strong Fits (70%+)
+          </div>
+          <div className="stat-value" style={{ color: 'var(--green)' }}>{high}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <AlertCircle size={12} /> Needs Work (below 40%)
+          </div>
+          <div className="stat-value" style={{ color: 'var(--red)' }}>{low}</div>
         </div>
       </div>
 
-      {/* Visual Analytics Panels */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-        
-        {/* Score Distribution Chart */}
-        <div className="glass-card" style={{ padding: '1.25rem' }}>
-          <h3 className="card-title" style={{ fontSize: '1rem', marginBottom: '1.25rem' }}>
-            <BarChart3 size={16} style={{ color: 'var(--color-accent)' }} />
-            Match Score Distribution
-          </h3>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: '160px', paddingBottom: '1rem', borderBottom: '1px solid var(--border-subtle)' }}>
-            {scoreRanges.map((range, idx) => {
-              const heightPercentage = (range.count / maxRangeCount) * 100;
-              return (
-                <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '16%', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: range.count > 0 ? '#fff' : 'var(--text-dark)' }}>
-                    {range.count}
-                  </span>
-                  <div style={{ 
-                    width: '100%', 
-                    height: '110px', 
-                    background: 'rgba(255,255,255,0.01)', 
-                    borderRadius: '8px', 
-                    display: 'flex', 
-                    alignItems: 'flex-end', 
-                    overflow: 'hidden' 
-                  }}>
-                    <div style={{ 
-                      width: '100%', 
-                      height: `${heightPercentage}%`, 
-                      background: 'var(--grad-primary)', 
-                      borderRadius: '4px',
-                      transition: 'height 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: '0 0 10px rgba(99, 102, 241, 0.2)'
-                    }} />
+      {/* Charts row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+        {/* Score distribution */}
+        <div className="card">
+          <div className="card-padded">
+            <p className="card-title" style={{ marginBottom: 16 }}>Score Distribution</p>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
+              height: 120, gap: 8, borderBottom: '1px solid var(--border)',
+              paddingBottom: 10, marginBottom: 8
+            }}>
+              {buckets.map((b, i) => {
+                const pct = (b.count / maxBucket) * 100;
+                return (
+                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: b.count > 0 ? 'var(--text-primary)' : 'var(--text-faint)' }}>{b.count}</span>
+                    <div style={{ width: '100%', maxWidth: 36, height: '100%', display: 'flex', alignItems: 'flex-end', background: 'var(--bg-raised)', borderRadius: '4px 4px 0 0', overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: `${pct}%`, background: 'var(--brand)', opacity: .75, borderRadius: '4px 4px 0 0', transition: 'height .5s ease' }} />
+                    </div>
                   </div>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                    {range.label}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              {buckets.map((b, i) => (
+                <span key={i} style={{ fontSize: '0.65rem', color: 'var(--text-faint)', flex: 1, textAlign: 'center' }}>{b.label}</span>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Category breakdown list */}
-        <div className="glass-card" style={{ padding: '1.25rem' }}>
-          <h3 className="card-title" style={{ fontSize: '1rem', marginBottom: '1.25rem' }}>
-            <PieChart size={16} style={{ color: 'var(--color-primary)' }} />
-            Candidate Skill Fields
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '160px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-            {categoryData.map((data, idx) => {
-              const share = Math.round((data.value / totalResumes) * 100);
-              return (
-                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 500 }}>
-                    <span style={{ color: '#fff' }}>{data.name}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{data.value} ({share}%)</span>
+        {/* Category breakdown */}
+        <div className="card">
+          <div className="card-padded">
+            <p className="card-title" style={{ marginBottom: 16 }}>Candidate Profiles</p>
+            <div className="mini-chart">
+              {catList.map(([name, count], i) => (
+                <div key={i} className="mini-chart-row">
+                  <span className="mini-chart-label" title={name}>{name}</span>
+                  <div className="mini-chart-track">
+                    <div className="mini-chart-fill" style={{ width: `${(count / maxCat) * 100}%` }} />
                   </div>
-                  <div className="progress-bar-container" style={{ height: '6px', margin: 0 }}>
-                    <div 
-                      className="progress-bar-fill" 
-                      style={{ 
-                        width: `${share}%`, 
-                        background: 'var(--grad-accent)',
-                        boxShadow: '0 0 6px rgba(6, 182, 212, 0.2)'
-                      }} 
-                    />
-                  </div>
+                  <span className="mini-chart-count">{count}</span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
 
