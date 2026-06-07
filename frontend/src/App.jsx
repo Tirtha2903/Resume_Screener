@@ -5,6 +5,7 @@ import ResultList       from './components/ResultList';
 import DetailModal      from './components/DetailModal';
 import Dashboard        from './components/Dashboard';
 import ImprovementPanel from './components/ImprovementPanel';
+import ResumeBuilder    from './components/ResumeBuilder';
 
 /* ── Theme helper ─────────────────────────────────────────── */
 function getInitialTheme() {
@@ -33,6 +34,7 @@ export default function App() {
   const [error, setError]             = useState('');
   const [retraining, setRetraining]   = useState(false);
   const [trainMsg, setTrainMsg]       = useState('');
+  const [viewMode, setViewMode]       = useState('screening'); // 'screening' | 'builder'
 
   // Apply theme on mount + change
   useEffect(() => { applyTheme(theme); }, [theme]);
@@ -115,11 +117,29 @@ export default function App() {
   return (
     <div className="app-wrap">
       <header className="app-header">
-        <div className="logo">
+        <div className="logo" style={{ cursor: 'pointer' }} onClick={() => setViewMode('screening')}>
           <div className="logo-mark"><FileSearch size={16} /></div>
           <span className="logo-name">ResumeAI</span>
           <span className="logo-tagline">· ML-powered screening</span>
         </div>
+        
+        <div style={{ display: 'flex', gap: 20, flex: 1, justifyContent: 'center' }}>
+          <button 
+            className={`btn-ghost ${viewMode === 'screening' ? 'active' : ''}`}
+            onClick={() => setViewMode('screening')}
+            style={{ fontWeight: viewMode === 'screening' ? 600 : 400, color: viewMode === 'screening' ? 'var(--brand)' : 'var(--text-muted)' }}
+          >
+            Screening & Match
+          </button>
+          <button 
+            className={`btn-ghost ${viewMode === 'builder' ? 'active' : ''}`}
+            onClick={() => setViewMode('builder')}
+            style={{ fontWeight: viewMode === 'builder' ? 600 : 400, color: viewMode === 'builder' ? 'var(--brand)' : 'var(--text-muted)' }}
+          >
+            Resume Builder
+          </button>
+        </div>
+
         <div className="header-right">
           <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
@@ -138,9 +158,12 @@ export default function App() {
         </div>
       </header>
 
-      <div className="main-layout">
-        {/* ── Sidebar ───────────────────────────────────────── */}
-        <aside>
+      {viewMode === 'builder' ? (
+        <ResumeBuilder onBack={() => setViewMode('screening')} />
+      ) : (
+        <div className="main-layout">
+          {/* ── Sidebar ───────────────────────────────────────── */}
+          <aside>
           <div className="card">
             <div className="card-header-bar">
               <p className="card-title">New Screening</p>
@@ -252,6 +275,7 @@ export default function App() {
           )}
         </main>
       </div>
+      )}
 
       {selected && (
         <DetailModal

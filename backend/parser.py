@@ -209,6 +209,233 @@ def parse_resume(file_path: str, filename: str = "") -> dict:
         "raw_text": cleaned_text
     }
 
+def parse_resume_content(raw_text: str) -> dict:
+    """
+    Parse raw pasted text (from ChatGPT/Claude/Gemini etc.) into structured
+    resume sections. Returns a dict with all the sections needed for template rendering.
+    """
+    lines = [l.strip() for l in raw_text.split('\n')]
+    text = raw_text
+
+    # ── Contact Info ──────────────────────────────────────
+    email = extract_email(text)
+    phone = extract_phone(text)
+
+    # LinkedIn
+    linkedin_match = re.search(r'linkedin\.com/in/[\w\-]+', text, re.IGNORECASE)
+    linkedin = linkedin_match.group(0) if linkedin_match else ''
+
+    # GitHub
+    github_match = re.search(r'github\.com/[\w\-]+', text, re.IGNORECASE)
+    github = github_match.group(0) if github_match else ''
+
+    # Portfolio / Website
+    website_match = re.search(r'https?://(?!linkedin|github)[\w.\-/]+', text, re.IGNORECASE)
+    website = website_match.group(0) if website_match else ''
+
+    # ── Name ──────────────────────────────────────────────
+    name = extract_name(text)
+
+    # ── Job Title / Tagline (line right after name) ───────
+    title = ''
+    non_empty = [l for l in lines if l.strip()]
+    if non_empty:
+        # First line that's not the name and not contact info
+        for ln in non_empty[:6]:
+            if ln == name:
+                continue
+            if re.search(r'@|\d{7,}|linkedin|github|http', ln, re.IGNORECASE):
+                continue
+            if 2 <= len(ln.split()) <= 8 and not ln.endswith(':'):
+                title = ln
+                break
+
+    # ── Section headers detection ─────────────────────────
+    SECTION_PATTERNS = {
+        'summary':        r'^(summary|profile|about|objective|about me|professional summary|career objective)\s*:?\s*$',
+        'experience':     r'^(experience|work experience|professional experience|employment|employment history|work history|career history)\s*:?\s*$',
+        'education':      r'^(education|academic background|academic qualifications|qualifications)\s*:?\s*$',
+        'skills':         r'^(skills|technical skills|core competencies|competencies|technologies|tech stack|key skills|skill set)\s*:?\s*$',
+        'projects':       r'^(projects|personal projects|key projects|notable projects|portfolio)\s*:?\s*$',
+        'certifications': r'^(certifications?|certificates?|licenses?|credentials?|achievements?|awards?)\s*:?\s*$',
+        'languages':      r'^(languages?|spoken languages?)\s*:?\s*$',
+        'interests':      r'^(interests?|hobbies|extracurricular)\s*:?\s*$',
+    }
+
+    sections = {}
+    current_section = None
+    current_content = []
+
+    for line in lines:
+        matched = False
+        for section, pattern in SECTION_PATTERNS.items():
+            if re.match(pattern, line.strip(), re.IGNORECASE):
+                if current_section and current_content:
+                    sections[current_section] = '\n'.join(current_content).strip()
+                current_section = section
+                current_content = []
+                matched = True
+                break
+        if not matched and current_section:
+            current_content.append(line)
+
+    if current_section and current_content:
+        sections[current_section] = '\n'.join(current_content).strip()
+
+    # ── Parse Experience entries ───────────────────────────
+    def parse_experience(text_block: str) -> list:
+        if not text_block:
+            return []
+        entries = []
+        # Split on blank lines or patterns that start a new entry
+        blocks = re.split(r'\n\s*\n', text_block)
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            block_lines = [l.strip() for l in block.split('\n') if l.strip()]
+            if not block_lines:
+                continue
+            entry = {
+                'title': '',
+                'company': '',
+                'dates': '',
+                'location': '',
+                'bullets': []
+            }
+            # First line: role title
+            entry['title'] = block_lines[0]
+            # Second line: company + dates + location
+            if len(block_lines) > 1:
+                second = block_lines[1]
+                # Extract dates
+                dates_match = re.search(
+                    r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\w\s,]*\d{4}\s*[-–—]\s*(?:Present|Current|Now|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[\w\s,]*\d{4})|\d{4}\s*[-–—]\s*(?:Present|\d{4}))',
+                    second, re.IGNORECASE
+                )
+                if dates_match:
+                    entry['dates'] = dates_match.group(0).strip()
+                    second = second.replace(dates_match.group(0), '').strip().strip('|,·•-').strip()
+                # Remaining: company | location
+                parts = re.split(r'\s*[|,·•]\s*', second)
+                if parts:
+                    entry['company'] = parts[0].strip()
+                if len(parts) > 1:
+                    entry['location'] = parts[1].strip()
+            # Rest: bullet points
+            for bl in block_lines[2:]:
+                bl = bl.lstrip('•*-·–—').strip()
+                if bl:
+                    entry['bullets'].append(bl)
+            entries.append(entry)
+        return entries
+
+    def parse_education(text_block: str) -> list:
+        if not text_block:
+            return []
+        entries = []
+        blocks = re.split(r'\n\s*\n', text_block)
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            block_lines = [l.strip() for l in block.split('\n') if l.strip()]
+            if not block_lines:
+                continue
+            entry = {'degree': '', 'school': '', 'dates': '', 'gpa': '', 'details': []}
+            entry['degree'] = block_lines[0]
+            if len(block_lines) > 1:
+                second = block_lines[1]
+                dates_match = re.search(r'(\d{4}\s*[-–—]\s*(?:Present|\d{4})|\d{4})', second)
+                if dates_match:
+                    entry['dates'] = dates_match.group(0).strip()
+                    second = second.replace(dates_match.group(0), '').strip().strip('|,·•-').strip()
+                gpa_match = re.search(r'GPA\s*[:.]?\s*([\d.]+)', block_lines[-1], re.IGNORECASE)
+                if gpa_match:
+                    entry['gpa'] = gpa_match.group(1)
+                entry['school'] = second
+            for bl in block_lines[2:]:
+                bl = bl.lstrip('•*-·').strip()
+                if bl and 'GPA' not in bl:
+                    entry['details'].append(bl)
+            entries.append(entry)
+        return entries
+
+    def parse_skills(text_block: str) -> list:
+        """Return list of skill strings"""
+        if not text_block:
+            return []
+        # Remove category labels like "Languages:" etc.
+        text_block = re.sub(r'^[\w\s]+:\s*', '', text_block, flags=re.MULTILINE)
+        # Split on commas, bullets, newlines, semicolons
+        raw = re.split(r'[,\n•|;/]+', text_block)
+        skills = []
+        for s in raw:
+            s = s.strip().lstrip('*-·').strip()
+            if s and len(s) < 50:
+                skills.append(s)
+        return [s for s in skills if s]
+
+    def parse_projects(text_block: str) -> list:
+        if not text_block:
+            return []
+        entries = []
+        blocks = re.split(r'\n\s*\n', text_block)
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            block_lines = [l.strip() for l in block.split('\n') if l.strip()]
+            if not block_lines:
+                continue
+            entry = {'name': block_lines[0], 'tech': '', 'bullets': []}
+            tech_match = re.search(r'Tech(?:nologies|nology|nical stack)?[:\s]+([^\n]+)', block, re.IGNORECASE)
+            if tech_match:
+                entry['tech'] = tech_match.group(1).strip()
+            for bl in block_lines[1:]:
+                bl = bl.lstrip('•*-·').strip()
+                if bl and not bl.startswith('Tech'):
+                    entry['bullets'].append(bl)
+            entries.append(entry)
+        return entries
+
+    def parse_certifications(text_block: str) -> list:
+        if not text_block:
+            return []
+        items = []
+        for line in text_block.split('\n'):
+            line = line.lstrip('•*-·').strip()
+            if line:
+                items.append(line)
+        return items
+
+    # ── Location ──────────────────────────────────────────
+    location_match = re.search(
+        r'\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?,\s*(?:[A-Z]{2,3}|[A-Z][a-z]+))\b',
+        text
+    )
+    location = location_match.group(0) if location_match else ''
+
+    return {
+        'name': name,
+        'title': title,
+        'email': email,
+        'phone': phone,
+        'linkedin': linkedin,
+        'github': github,
+        'website': website,
+        'location': location,
+        'summary': sections.get('summary', '').strip(),
+        'skills': parse_skills(sections.get('skills', '')),
+        'experience': parse_experience(sections.get('experience', '')),
+        'education': parse_education(sections.get('education', '')),
+        'projects': parse_projects(sections.get('projects', '')),
+        'certifications': parse_certifications(sections.get('certifications', '')),
+        'languages': parse_skills(sections.get('languages', '')),
+        'interests': parse_certifications(sections.get('interests', '')),
+    }
+
+
 if __name__ == "__main__":
     # Test script locally
     test_resume = """
@@ -225,7 +452,6 @@ if __name__ == "__main__":
     """
     
     print("Testing parser with mockup text:")
-    # Mock file parsing using inline string logic
     email = extract_email(test_resume)
     phone = extract_phone(test_resume)
     name = extract_name(test_resume)
@@ -235,3 +461,4 @@ if __name__ == "__main__":
     print(f"Email: {email}")
     print(f"Phone: {phone}")
     print(f"Skills: {skills}")
+

@@ -5,7 +5,7 @@ from typing import List
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from parser import parse_resume, extract_skills
+from parser import parse_resume, extract_skills, parse_resume_content
 from model import (
     predict_category, calculate_match_score, train_model,
     calculate_satisfaction_score, generate_improvement_suggestions
@@ -239,7 +239,24 @@ async def rescreen_resume(
     }
 
 
+@app.post("/api/build-resume")
+async def build_resume(
+    raw_text: str = Form(...)
+):
+    """
+    Parse raw AI-generated text and return a structured JSON response 
+    for the frontend Resume Builder templates.
+    """
+    try:
+        structured_data = parse_resume_content(raw_text)
+        return {
+            "status": "success",
+            "data": structured_data
+        }
+    except Exception as e:
+        print(f"Error parsing resume content: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
