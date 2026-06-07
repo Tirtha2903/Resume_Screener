@@ -1,0 +1,25 @@
+David Miller
+Product Manager
+david.miller@example.com | (555) 555-0199
+
+PROFESSIONAL SUMMARY
+Dynamic and analytical Product Manager with 5 years of experience leading cross-functional teams to launch high-impact SaaS products. Skilled in agile methodologies, defining product roadmaps, and conducting data-driven user research to achieve key product-market fit.
+
+TECHNICAL SKILLS
+- Methodologies: Agile, Scrum, Kanban, Product Lifecycle, User Journey Mapping
+- Product Tools: Jira, Confluence, Trello, Productboard
+- Analytics & Design: SQL, Tableau, Figma, Adobe XD, Wireframing, Prototyping
+- Collaboration: Cross-functional Leadership, Stakeholder Management, Agile Sprint Planning
+
+EXPERIENCE
+Product Manager | CloudSphere Technologies
+2023 - Present
+- Created and executed the product roadmap for a cloud storage dashboard, growing Monthly Active Users (MAU) by 25% within 6 months.
+- Led a cross-functional team of 10 developers and 2 UI/UX designers using Agile Scrum processes.
+- Authored detailed user stories, PRDs (Product Requirement Documents), and conducted sprint planning, sprint reviews, and retrospective sessions in Jira.
+
+Associate Product Owner | Enterprise Solutions
+2021 - 2023
+- Managed the product backlog, prioritizing stories based on business value, customer feedback, and engineering complexity.
+- Conducted user interviews and user testing sessions, translating findings into wireframes and prototyping requirements in Figma.
+- Utilized SQL queries and Tableau dashboards to track product KPIs and report engagement metrics to stakeholders.

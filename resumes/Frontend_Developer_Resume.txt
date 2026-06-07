@@ -1,0 +1,25 @@
+Sarah Jenkins
+Frontend Developer
+sarah.jenkins@example.com | (555) 987-6543
+
+PROFESSIONAL SUMMARY
+Creative and user-focused Frontend Developer with 4 years of experience building responsive, highly interactive, and accessible web applications. Expert in React.js and modern JavaScript/TypeScript ecosystem. Passionate about pixel-perfect implementations, SEO, and visual performance optimization.
+
+TECHNICAL SKILLS
+- Core Languages: JavaScript (ES6+), TypeScript, HTML5, CSS3, Sass
+- Frameworks & Libraries: React, React.js, Next.js, Redux Toolkit, Tailwind CSS, Bootstrap, Material UI (MUI)
+- Tools & Environment: Webpack, Vite, NPM, Git, GitHub Actions, Figma
+- Testing: Jest, Cypress, Playwright
+
+EXPERIENCE
+React Developer | WebCraft Studios
+2023 - Present
+- Designed and built responsive client dashboards using React, Next.js, and TypeScript, improving overall mobile conversion rates by 22%.
+- Optimized bundle sizes and lazy-loaded assets in Webpack and Vite, decreasing average page load times by 1.2 seconds.
+- Translated high-fidelity UI/UX design mockups from Figma into clean, responsive, and semantic HTML/CSS components.
+
+Junior Frontend Developer | DesignFlow Co.
+2021 - 2023
+- Developed cross-browser compatible websites using HTML, CSS, JavaScript, and Tailwind CSS.
+- Maintained global state management systems using Redux, integrating REST APIs for dynamic content updates.
+- Wrote unit and integration test coverage using Jest and Cypress, maintaining 85% code coverage.

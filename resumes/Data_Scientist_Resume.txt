@@ -1,0 +1,25 @@
+Tirth Patel
+Data Scientist
+tirth.patel@example.com | +91 9876543210
+
+PROFESSIONAL SUMMARY
+Highly analytical and detail-oriented Data Scientist with 3+ years of experience designing and deploying machine learning models, predictive pipelines, and data analytics dashboards. Proven ability to translate complex datasets into actionable business intelligence.
+
+TECHNICAL SKILLS
+- Programming Languages: Python, R, SQL
+- Machine Learning & Deep Learning: Scikit-Learn, TensorFlow, PyTorch, Keras, NLP, Computer Vision, Regression, Classification, Clustering
+- Data Analytics & Visualization: Pandas, NumPy, Tableau, Power BI, Matplotlib, Seaborn
+- Databases & Cloud: PostgreSQL, MongoDB, AWS (S3, EC2), Git
+
+EXPERIENCE
+Data Scientist | TechCorp Solutions
+2024 - Present
+- Developed a customer churn prediction model using Random Forest and XGBoost in Scikit-Learn, reducing churn rates by 18%.
+- Built an automated NLP text categorization pipeline for support tickets using TensorFlow, speeding up ticket routing by 35%.
+- Maintained SQL queries and ETL pipelines for handling over 10M records daily, ensuring clean data loading in PostgreSQL database.
+
+Data Analyst | Insight Analytics
+2022 - 2024
+- Conducted cohort analysis and created interactive Tableau dashboards to track key company performance indicators.
+- Performed statistical modeling and A/B testing on marketing campaigns, raising conversion metrics by 10%.
+- Extracted and cleaned structured and unstructured data using Pandas and NumPy.
